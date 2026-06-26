@@ -73,25 +73,33 @@ client.on('messageCreate', async (message) => {
 
     // 🎵 JOIN (FIXED)
     if (message.content === '!join') {
-        const voiceChannel = message.member.voice.channel;
+    console.log("STEP 1");
 
-        if (!voiceChannel) {
-            return message.reply('❌ Pehle voice channel join karo');
-        }
+    const voiceChannel = message.member.voice.channel;
 
-        try {
-            connection = joinVoiceChannel({
-                channelId: voiceChannel.id,
-                guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator
-            });
-
-            return message.reply('✅ Joined voice channel');
-        } catch (error) {
-            console.error(error);
-            return message.reply('❌ Join failed');
-        }
+    if (!voiceChannel) {
+        console.log("STEP 2");
+        return message.reply("❌ Voice channel join karo");
     }
+
+    console.log("STEP 3");
+
+    try {
+        connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: message.guild.id,
+            adapterCreator: message.guild.voiceAdapterCreator,
+            selfDeaf: false
+        });
+
+        console.log("STEP 4");
+
+        await message.channel.send("✅ Joined command executed");
+    } catch (err) {
+        console.error("JOIN ERROR:", err);
+        await message.channel.send("❌ Join failed");
+    }
+}
 
     // 🎵 PLAY (FIXED)
     if (message.content.startsWith('!play')) {
