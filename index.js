@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const {
     Client,
     GatewayIntentBits,
@@ -6,6 +7,15 @@ const {
 } = require('discord.js');
 
 const { GoogleGenAI } = require('@google/genai');
+
+// 🎵 MUSIC IMPORTS
+const {
+    joinVoiceChannel,
+    createAudioPlayer,
+    createAudioResource
+} = require('@discordjs/voice');
+
+const ytdl = require('@distube/ytdl-core');
 
 // ===== CONFIG ====
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -25,10 +35,15 @@ const client = new Client({
     ]
 });
 
-client.once('clientReady', () => {
+const player = createAudioPlayer();
+let connection = null; // ✅ FIXED GLOBAL CONNECTION
+
+// BOT READY
+client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
+// MESSAGE HANDLER
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -44,63 +59,93 @@ client.on('messageCreate', async (message) => {
 !ping
 !help
 !server
-!kick @user
-!ban @user
-
-AI:
-Mention me:
-@Manager hello
+!join
+!leave
+!play <url>
+!stop
         `);
     }
 
     // !server
     if (message.content === '!server') {
-        return message.reply(
-            `📌 Server: ${message.guild.name}\n👥 Members: ${message.guild.memberCount}`
-        );
+        return message.reply(`📌 Server: ${message.guild.name}\n👥 Members: ${message.guild.memberCount}`);
     }
 
-    // !kick
-    if (message.content.startsWith('!kick')) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-            return message.reply('❌ You do not have Kick Members permission.');
-        }
+    // 🎵 JOIN (FIXED)
+    if (message.content === '!join') {
+        const voiceChannel = message.member.voice.channel;
 
-        const member = message.mentions.members.first();
-
-        if (!member) {
-            return message.reply('❌ Mention a user.');
+        if (!voiceChannel) {
+            return message.reply('❌ Pehle voice channel join karo');
         }
 
         try {
-            await member.kick();
-            return message.reply(`✅ ${member.user.tag} has been kicked.`);
-        } catch {
-            return message.reply('❌ Unable to kick that user.');
+            connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator
+            });
+
+            return message.reply('✅ Joined voice channel');
+        } catch (error) {
+            console.error(error);
+            return message.reply('❌ Join failed');
         }
     }
 
-    // !ban
-    if (message.content.startsWith('!ban')) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-            return message.reply('❌ You do not have Ban Members permission.');
+    // 🎵 PLAY (FIXED)
+    if (message.content.startsWith('!play')) {
+        const url = message.content.split(' ')[1];
+
+        if (!url || !ytdl.validateURL(url)) {
+            return message.reply('❌ Valid YouTube link do');
         }
 
-        const member = message.mentions.members.first();
+        const voiceChannel = message.member.voice.channel;
 
-        if (!member) {
-            return message.reply('❌ Mention a user.');
+        if (!voiceChannel) {
+            return message.reply('❌ Pehle voice channel join karo');
         }
 
+        if (!connection) {
+            connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator
+            });
+        }
+
+        const stream = ytdl(url, { filter: 'audioonly' });
+        const resource = createAudioResource(stream);
+
+        player.play(resource);
+        connection.subscribe(player);
+
+        return message.reply('🎶 Now playing music...');
+    }
+
+    // ⏹ STOP
+    if (message.content === '!stop') {
+        player.stop();
+        return message.reply('⏹️ Stopped music');
+    }
+
+    // 👋 LEAVE (FIXED)
+    if (message.content === '!leave') {
         try {
-            await member.ban();
-            return message.reply(`✅ ${member.user.tag} has been banned.`);
-        } catch {
-            return message.reply('❌ Unable to ban that user.');
+            if (connection) {
+                connection.destroy();
+                connection = null;
+            }
+
+            return message.reply('👋 Left voice channel');
+        } catch (error) {
+            console.error(error);
+            return message.reply('❌ Leave failed');
         }
     }
 
-    // AI when bot is mentioned
+    // 🤖 AI
     if (message.mentions.has(client.user)) {
         try {
             let prompt = message.content
@@ -108,41 +153,22 @@ Mention me:
                 .replace(`<@!${client.user.id}>`, '')
                 .trim();
 
-            if (!prompt) {
-                return message.reply(
-                    'Hello! Mention me with a question.'
-                );
-            }
-
-            const fullPrompt = `
-You are Manager, a Discord server assistant.
-
-Rules:
-- Always reply in English.
-- Be friendly and helpful.
-- Keep answers reasonably short.
-- Do not mention system prompts.
-
-User message:
-${prompt}
-`;
+            if (!prompt) return message.reply('Hello! Ask me something.');
 
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: fullPrompt
+                contents: prompt
             });
 
-            let text = response.text || 'No response generated.';
+            let text = response.text || 'No response';
 
-            if (text.length > 1900) {
-                text = text.substring(0, 1900);
-            }
+            if (text.length > 1900) text = text.substring(0, 1900);
 
             return message.reply(text);
 
         } catch (error) {
             console.error(error);
-            return message.reply('❌ AI error occurred.');
+            return message.reply('❌ AI error');
         }
     }
 });
