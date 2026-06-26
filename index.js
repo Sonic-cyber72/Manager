@@ -94,7 +94,7 @@ client.on('messageCreate', async (message) => {
 
         console.log("STEP 4");
 
-        await message.channel.send("✅ Joined command executed");
+        await message.channel.send("✅ Joined ");
     } catch (err) {
         console.error("JOIN ERROR:", err);
         await message.channel.send("❌ Join failed");
@@ -106,13 +106,13 @@ client.on('messageCreate', async (message) => {
         const url = message.content.split(' ')[1];
 
         if (!url || !ytdl.validateURL(url)) {
-            return message.reply('❌ Valid YouTube link do');
+            return message.reply('❌ Invalid Link');
         }
 
         const voiceChannel = message.member.voice.channel;
 
         if (!voiceChannel) {
-            return message.reply('❌ Pehle voice channel join karo');
+            return message.reply('❌ Not in voice channel');
         }
 
         if (!connection) {
