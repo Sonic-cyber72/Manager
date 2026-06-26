@@ -15,7 +15,7 @@ const {
     createAudioResource
 } = require('@discordjs/voice');
 
-const ytdl = require('@distube/ytdl-core');
+const play = require('play-dl');
 
 // ===== CONFIG ====
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -103,35 +103,43 @@ client.on('messageCreate', async (message) => {
 
     // 🎵 PLAY (FIXED)
     if (message.content.startsWith('!play')) {
-        const url = message.content.split(' ')[1];
+    const url = message.content.split(' ')[1];
 
-        if (!url || !ytdl.validateURL(url)) {
-            return message.reply('❌ Invalid Link');
-        }
+    if (!url) {
+        return message.reply('❌ Invalid Link');
+    }
 
-        const voiceChannel = message.member.voice.channel;
+    const voiceChannel = message.member.voice.channel;
 
-        if (!voiceChannel) {
-            return message.reply('❌ Not in voice channel');
-        }
+    if (!voiceChannel) {
+        return message.reply('❌ Not in voice channel');
+    }
 
+    try {
         if (!connection) {
             connection = joinVoiceChannel({
                 channelId: voiceChannel.id,
                 guildId: message.guild.id,
-                adapterCreator: message.guild.voiceAdapterCreator
+                adapterCreator: message.guild.voiceAdapterCreator,
+                selfDeaf: false
             });
         }
 
-        const stream = ytdl(url, { filter: 'audioonly' });
-        const resource = createAudioResource(stream);
+        const stream = await play.stream(url);
+
+        const resource = createAudioResource(stream.stream, {
+            inputType: stream.type
+        });
 
         player.play(resource);
         connection.subscribe(player);
 
-        return message.reply('🎶 Now playing music...');
+        return message.reply('🎶 Now Playing...');
+    } catch (err) {
+        console.error(err);
+        return message.reply('❌ Failed to play music.');
     }
-
+}
     // ⏹ STOP
     if (message.content === '!stop') {
         player.stop();
